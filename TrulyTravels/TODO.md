@@ -1,0 +1,4 @@
+- [x] Create new plan-trip.html page with "Plan Your Trip" title and form fields: From, To, Departure Date, Return Date, Number of Travelers
+- [x] Update app.js to redirect to plan-trip.html when "Get Started" button is clicked
+- [x] Remove plan-trip section from index.html
+- [x] Test the functionality by running the app and clicking "Get Started" (Server started on port 3000)
