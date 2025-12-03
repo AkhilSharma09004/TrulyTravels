@@ -132,3 +132,4 @@ async function loadTripHistory() {
 
 // Initialize
 showHome();
+
