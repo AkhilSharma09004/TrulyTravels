@@ -1,135 +1,252 @@
-// DOM elements
-const homeSection = document.getElementById('home-section');
-const resultsSection = document.getElementById('results-section');
-const historySection = document.getElementById('history-section');
-const pricingSection = document.getElementById('pricing-section');
-const tripForm = document.getElementById('trip-form');
-const costBreakdown = document.getElementById('cost-breakdown');
-const tripHistory = document.getElementById('trip-history');
-const saveTripBtn = document.getElementById('save-trip-btn');
+// public/app.js
+(function () {
+  const $ = (q) => document.querySelector(q);
 
-// Navigation
-document.getElementById('home-btn').addEventListener('click', showHome);
-document.getElementById('history-btn').addEventListener('click', showHistory);
-document.getElementById('pricing-btn').addEventListener('click', showPricing);
-document.getElementById('get-started-btn').addEventListener('click', showPlanTrip);
+  const STORAGE = "trulytravels_trips";
+  const FAILED_QUEUE_KEY = "trulytravels_failed_queue";
 
-function showHome() {
-  hideAllSections();
-  homeSection.classList.remove('hidden');
-}
-
-function showHistory() {
-  hideAllSections();
-  historySection.classList.remove('hidden');
-  loadTripHistory();
-}
-
-function showPricing() {
-  hideAllSections();
-  pricingSection.classList.remove('hidden');
-}
-
-function showPlanTrip() {
-  window.location.href = 'plan-trip.html';
-}
-
-function hideAllSections() {
-  homeSection.classList.add('hidden');
-  resultsSection.classList.add('hidden');
-  historySection.classList.add('hidden');
-  pricingSection.classList.add('hidden');
-}
-
-// Form submission
-tripForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-
-  const formData = {
-    origin: document.getElementById('origin').value,
-    destination: document.getElementById('destination').value,
-    startDate: document.getElementById('start-date').value,
-    endDate: document.getElementById('end-date').value,
-    travelers: parseInt(document.getElementById('travelers').value),
-    accommodation: document.getElementById('accommodation').value,
-    transportation: document.getElementById('transportation').value
-  };
-
-  try {
-    const response = await fetch('/api/estimate', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(formData)
-    });
-
-    const trip = await response.json();
-    displayCostBreakdown(trip);
-    showResults();
-  } catch (error) {
-    console.error('Error estimating trip:', error);
-    alert('Error estimating trip. Please try again.');
+  function loadLocal() {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE) || "[]");
+    } catch {
+      localStorage.removeItem(STORAGE);
+      return [];
+    }
   }
-});
 
-function displayCostBreakdown(trip) {
-  costBreakdown.innerHTML = `
-    <div class="breakdown-item">
-      <span>Transportation:</span>
-      <span>$${trip.breakdown.transportation}</span>
-    </div>
-    <div class="breakdown-item">
-      <span>Accommodation:</span>
-      <span>$${trip.breakdown.accommodation}</span>
-    </div>
-    <div class="breakdown-item">
-      <span>Food:</span>
-      <span>$${trip.breakdown.food}</span>
-    </div>
-    <div class="breakdown-item">
-      <span>Activities:</span>
-      <span>$${trip.breakdown.activities}</span>
-    </div>
-    <div class="breakdown-item total">
-      <span>Total Cost:</span>
-      <span>$${trip.totalCost}</span>
-    </div>
-  `;
-}
+  function saveLocal(list) {
+    localStorage.setItem(STORAGE, JSON.stringify(list));
+  }
 
-function showResults() {
-  hideAllSections();
-  resultsSection.classList.remove('hidden');
-}
+  function pushFailedSave(trip) {
+    const q = JSON.parse(localStorage.getItem(FAILED_QUEUE_KEY) || "[]");
+    q.push({ trip, ts: new Date().toISOString() });
+    localStorage.setItem(FAILED_QUEUE_KEY, JSON.stringify(q));
+  }
 
-saveTripBtn.addEventListener('click', () => {
-  alert('Trip saved!');
-  showHome();
-});
+  async function processFailedQueue() {
+    const raw = localStorage.getItem(FAILED_QUEUE_KEY);
+    if (!raw) return;
 
-async function loadTripHistory() {
-  try {
-    const response = await fetch('/api/trips');
-    const trips = await response.json();
+    const q = JSON.parse(raw);
+    const newQueue = [];
 
-    tripHistory.innerHTML = '';
-    trips.forEach(trip => {
-      const tripElement = document.createElement('div');
-      tripElement.className = 'trip-item';
-      tripElement.innerHTML = `
-        <h3>${trip.origin} to ${trip.destination}</h3>
-        <p>Dates: ${trip.startDate} to ${trip.endDate}</p>
-        <p>Travelers: ${trip.travelers}</p>
-        <p>Total Cost: $${trip.totalCost}</p>
+    for (const item of q) {
+      try {
+        const res = await fetch("/api/trips", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(item.trip),
+        });
+        if (!res.ok) throw new Error();
+      } catch {
+        newQueue.push(item);
+      }
+    }
+
+    if (newQueue.length)
+      localStorage.setItem(FAILED_QUEUE_KEY, JSON.stringify(newQueue));
+    else localStorage.removeItem(FAILED_QUEUE_KEY);
+  }
+
+  window.addEventListener("load", () =>
+    processFailedQueue().catch(() => {})
+  );
+
+  // ========================================
+  // PAGE LOADED
+  // ========================================
+
+  window.addEventListener("DOMContentLoaded", () => {
+    // NAV BUTTONS
+    const homeBtn = $("#home-btn");
+    const historyBtn = $("#history-btn");
+    const pricingBtn = $("#pricing-btn");
+    const planBtn = $("#plan-btn");
+
+    const homeSection = $("#home-section");
+    const historySection = $("#history-section");
+    const pricingSection = $("#pricing-section");
+    const resultsSectionNav = $("#results-section");
+
+    function hideAll() {
+      homeSection?.classList.add("hidden");
+      historySection?.classList.add("hidden");
+      pricingSection?.classList.add("hidden");
+      resultsSectionNav?.classList.add("hidden");
+    }
+
+    function showHome() {
+      hideAll();
+      homeSection?.classList.remove("hidden");
+    }
+
+    function showHistory() {
+      hideAll();
+      historySection?.classList.remove("hidden");
+      renderHistory();
+    }
+
+    function showPricing() {
+      hideAll();
+      pricingSection?.classList.remove("hidden");
+    }
+
+    if (homeBtn) homeBtn.onclick = showHome;
+    if (historyBtn) historyBtn.onclick = showHistory;
+    if (pricingBtn) pricingBtn.onclick = showPricing;
+    if (planBtn) planBtn.onclick = () => (location.href = "plan-trip.html");
+
+    // ⭐⭐⭐ GET STARTED BUTTON FIXED ⭐⭐⭐
+    const getStart = $("#get-started-btn");
+    if (getStart) getStart.onclick = () => (location.href = "plan-trip.html");
+
+    // FORM ELEMENTS
+    const form = $("#trip-form");
+    const costBox = $("#cost-breakdown");
+    const saveBtn = $("#save-trip-btn");
+    const pdfBtn = $("#download-pdf-btn");
+    const historyBox = $("#trip-history");
+    const resultsSection = $("#results-section");
+
+    // RENDER HISTORY
+    function renderHistory() {
+      const trips = loadLocal();
+      historyBox.innerHTML =
+        trips.length === 0
+          ? "<p>No trips saved yet.</p>"
+          : trips
+              .map(
+                (t) => `
+            <div class="trip-item">
+              <h3>${t.origin} (${t.originIATA}) → ${t.destination} (${t.destinationIATA})</h3>
+              <p>Dates: ${t.startDate} to ${t.endDate}</p>
+              <p>Travelers: ${t.travelers}</p>
+              <p>Total Cost: ₹${t.totalCost.toLocaleString()}</p>
+            </div>`
+              )
+              .join("");
+    }
+
+    // FETCH SERVER ESTIMATE
+    async function estimateTrip(data) {
+      try {
+        const res = await fetch("/api/estimate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        });
+
+        if (!res.ok) throw new Error();
+        return await res.json();
+      } catch {
+        alert("⚠ Server offline — using fallback estimator.");
+        return fallbackEstimate(data);
+      }
+    }
+
+    // CLEAN UI COST DISPLAY (NO TEXT MERGING)
+    function displayCost(trip) {
+      const b = trip.breakdown;
+
+      costBox.innerHTML = `
+        <div class="breakdown-item"><span>Transportation:</span><span>₹${b.transportation.toLocaleString()}</span></div>
+        <div class="breakdown-item"><span>Accommodation:</span><span>₹${b.accommodation.toLocaleString()}</span></div>
+        <div class="breakdown-item"><span>Food:</span><span>₹${b.food.toLocaleString()}</span></div>
+        <div class="breakdown-item"><span>Activities:</span><span>₹${b.activities.toLocaleString()}</span></div>
+        <div class="breakdown-item"><span>Misc:</span><span>₹${b.misc.toLocaleString()}</span></div>
+
+        <div class="breakdown-item total">
+          <span>Total Cost:</span>
+          <span>₹${trip.totalCost.toLocaleString()}</span>
+        </div>
+
+        <p style="margin-top:15px;">Flight price source: <b>${b.flightSource}</b></p>
+        <p>IATA: ${trip.originIATA} → ${trip.destinationIATA}</p>
       `;
-      tripHistory.appendChild(tripElement);
-    });
-  } catch (error) {
-    console.error('Error loading trip history:', error);
-  }
-}
 
-// Initialize
-showHome();
+      resultsSection.classList.remove("hidden");
+    }
 
+    // SAVE TRIP
+    async function saveTrip(trip) {
+      const local = loadLocal();
+      local.unshift(trip);
+      saveLocal(local);
+
+      try {
+        const res = await fetch("/api/trips", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(trip),
+        });
+
+        if (!res.ok) throw new Error();
+        alert("✔ Trip saved to server AND local storage!");
+      } catch {
+        pushFailedSave(trip);
+        alert("⚠ Saved locally — server unavailable.");
+      }
+
+      renderHistory();
+    }
+
+    // FORM SUBMIT
+    if (form) {
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const data = {
+          origin: $("#origin").value.trim(),
+          destination: $("#destination").value.trim(),
+          startDate: $("#start-date").value,
+          endDate: $("#end-date").value,
+          travelers: $("#travelers").value,
+          accommodation: $("#accommodation").value,
+          transportation: $("#transportation").value,
+          promoCode: $("#promoCode")?.value || "",
+        };
+
+        const trip = await estimateTrip(data);
+        window.lastTrip = trip;
+
+        displayCost(trip);
+
+        saveBtn.onclick = () => saveTrip(trip);
+      });
+    }
+
+    // PDF DOWNLOAD
+    if (pdfBtn) {
+      pdfBtn.onclick = async () => {
+        if (!window.lastTrip)
+          return alert("Estimate a trip first!");
+
+        try {
+          const res = await fetch("/api/export-pdf", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(window.lastTrip),
+          });
+
+          if (!res.ok) throw new Error();
+
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "trip-summary.pdf";
+          a.click();
+
+          URL.revokeObjectURL(url);
+        } catch {
+          alert("PDF download failed — check server.");
+        }
+      };
+    }
+
+    // INITIAL HISTORY LOAD
+    renderHistory();
+  });
+})();
