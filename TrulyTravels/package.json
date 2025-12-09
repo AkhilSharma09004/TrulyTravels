@@ -1,18 +1,21 @@
 {
-  "name": "voyage-budget",
+  "name": "trulytravels",
   "version": "1.0.0",
-  "description": "A simple travel budget planner app",
+  "description": "TrulyTravels cost estimator with Amadeus integration",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "nodemon server.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
+    "amadeus": "^5.2.0",
+    "body-parser": "^1.20.0",
     "cors": "^2.8.5",
-    "body-parser": "^1.20.2"
+    "dotenv": "^16.6.1",
+    "express": "^4.18.2",
+    "pdf-lib": "^1.17.1"
   },
-  "keywords": ["travel", "budget", "planner"],
-  "author": "",
-  "license": "MIT"
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  }
 }
