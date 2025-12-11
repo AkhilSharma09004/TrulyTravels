@@ -1,0 +1,30 @@
+[
+  {
+    "id": "1765360878802",
+    "origin": "Goa",
+    "destination": "Mumbai",
+    "startDate": "2025-12-12",
+    "endDate": "2025-12-16",
+    "travelers": "1",
+    "accommodation": "mid",
+    "transportation": "economy",
+    "promoCode": "",
+    "originIATA": "GOI",
+    "destinationIATA": "BOM",
+    "breakdown": {
+      "transportation": 6000,
+      "accommodation": 10000,
+      "food": 2000,
+      "activities": 1200,
+      "misc": 300,
+      "flightPerPerson": 6000,
+      "flightSource": "fallback"
+    },
+    "totalCost": "25500fallback",
+    "meta": {
+      "nights": 4,
+      "roomsNeeded": 1
+    },
+    "createdAt": "2025-12-10T10:01:18.803Z"
+  }
+]
